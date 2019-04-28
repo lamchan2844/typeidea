@@ -1,13 +1,22 @@
 from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
+from django.contrib.admin.models import LogEntry
 
 from .models import Post, Category, Tag
+from .adminform import PostAdminForm
+from typeidea.custom_site import custom_site
+from typeidea.base_admin import BaseOwnerAdmin
 
 # Register your models here.
 
-@admin.register(Category)
-class CategoryAdmin(admin.ModelAdmin):
+class PostInline(admin.TabularInline):
+    fields = ('title', 'desc')
+    extra = 1
+    model = Post
+
+@admin.register(Category, site = custom_site)
+class CategoryAdmin(BaseOwnerAdmin):
     list_display = ('name', 'status', 'is_nav', 'post_count', 'create_time')
     fields = ('name', 'status', 'is_nav')
 
@@ -16,18 +25,14 @@ class CategoryAdmin(admin.ModelAdmin):
 
     post_count.short_description = '文章数量'
 
-    def save_model(self, request, obj, form, change):
-        obj.owner = request.user
-        return super(CategoryAdmin, self).save_model(request, obj, form, change)
+    #inlines = [PostInline, ]
 
-@admin.register(Tag)
-class TagAdmin(admin.ModelAdmin):
+
+@admin.register(Tag, site = custom_site)
+class TagAdmin(BaseOwnerAdmin):
     list_display = ('name', 'status', 'create_time')
     fields = ('name', 'status')
 
-    def save_model(self, request, obj, form, change):
-        obj.owner = request.user
-        return super(TagAdmin, self).save_model(request, obj, form, change)
 
 class CategoryOwnerFilter(admin.SimpleListFilter):
     title = '分类过滤器'
@@ -42,8 +47,8 @@ class CategoryOwnerFilter(admin.SimpleListFilter):
             return queryset.filter(category_id = self.value())
         return queryset
 
-@admin.register(Post)
-class PostAdmin(admin.ModelAdmin):
+@admin.register(Post, site = custom_site)
+class PostAdmin(BaseOwnerAdmin):
     list_display = [
         'title', 'category', 'status', 'owner',
         'create_time', 'operator'
@@ -86,15 +91,19 @@ class PostAdmin(admin.ModelAdmin):
     def operator(self, obj):
         return format_html(
             '<a href="{}">编辑</a>',
-            reverse('admin:blog_post_change', args = (obj.id,))
+            reverse('cus_admin:blog_post_change', args = (obj.id,))
         )
     operator.short_description = '操作'
 
-    def save_model(self, request, obj, form, change):
-        obj.owner = request.user
-        return super(PostAdmin, self).save_model(request, obj, form, change)
+    form = PostAdminForm
 
-    def get_queryset(self, request):
-        qs = super(PostAdmin, self).get_queryset(request)
-        return qs.filter(owner = request.user)
+    class Media:
+        css = {
+            'all' : ('https://cdn.bootcss.com/bootstrap/4.0.0-beta.2/css/bootstrap.min.css', ),
+        }
+        js = ('https://cdn.bootcss.com/bootstrap/4.0.0-beta.2/js/bootstrap.bundle.js', )
 
+
+@admin.register(LogEntry)
+class LogEntryAdmin(admin.ModelAdmin):
+    list_display = ['object_repr', 'object_id', 'action_flag', 'user', 'change_message']
